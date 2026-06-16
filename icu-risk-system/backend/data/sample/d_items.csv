@@ -1,0 +1,7 @@
+itemid,label,abbreviation,category
+211,Heart Rate,HR,Routine Vital Signs
+618,Respiratory Rate,RR,Routine Vital Signs
+646,SpO2,SpO2,Routine Vital Signs
+676,Temperature Celsius,Temp C,Routine Vital Signs
+51,Arterial BP [Systolic],ArtSBP,Routine Vital Signs
+8368,Arterial BP [Diastolic],ArtDBP,Routine Vital Signs

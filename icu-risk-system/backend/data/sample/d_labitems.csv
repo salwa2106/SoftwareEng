@@ -1,0 +1,9 @@
+itemid,label,fluid,category
+51301,White Blood Cell Count,Blood,Hematology
+50912,Creatinine,Blood,Chemistry
+50813,Lactate,Blood,Blood Gas
+51222,Hemoglobin,Blood,Hematology
+51265,Platelet Count,Blood,Hematology
+50983,Sodium,Blood,Chemistry
+50971,Potassium,Blood,Chemistry
+50885,"Bilirubin, Total",Blood,Chemistry
