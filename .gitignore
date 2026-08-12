@@ -1,0 +1,31 @@
+﻿# Dependencies
+node_modules/
+venv/
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+!.env.example
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Build output
+/pulse-guardian-icu/frontend/build/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Packaged site zip (built artifact, not versioned)
+/dist/
+
+# Large presentation binary - dropped in at packaging time, not versioned
+site/assets/*.pptx
