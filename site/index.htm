@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Guardian ICU — Final Project Site</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <h1>Pulse Guardian ICU</h1>
+  <p class="subtitle">AI-Assisted ICU Clinical Risk Monitoring — Software Engineering in the AI Era, Final Project</p>
+  <p class="subtitle">Built on the MIMIC-III Clinical Database</p>
+  <div class="badge-row">
+    <span class="badge">Rule-based + trained ML risk scoring</span>
+    <span class="badge">Validated against real outcomes</span>
+    <span class="badge">Automated tests + CI</span>
+  </div>
+  <div class="disclaimer">
+    ⚠ For academic / demonstration use only. This system is not a validated clinical decision-support
+    tool and must not be used for real patient care.
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#team">Team</a>
+  <a href="#overview">Overview</a>
+  <a href="#s1">1. Research Question</a>
+  <a href="#s2">2. Method &amp; Architecture</a>
+  <a href="#s3">3. Implementation &amp; Evaluation</a>
+  <a href="#s4">4. Development Process</a>
+  <a href="#s5">5. Summary &amp; Future Work</a>
+  <a href="#s6">6. User Manual</a>
+  <a href="#s7">7. Related Papers</a>
+  <a href="#downloads">Downloads</a>
+</nav>
+
+<main>
+
+<section class="block" id="team">
+  <h2>Team &amp; Topic</h2>
+  <p><strong>Topic:</strong> Pulse Guardian ICU — an AI-based clinical decision-support dashboard for
+  early detection of ICU patient deterioration, built on the MIMIC-III database, developed as the
+  final project for the <em>Software Engineering in the AI Era</em> seminar.</p>
+  <ul class="team-list">
+    <li>Layan Shawahny</li>
+    <li>Dana Naser</li>
+    <li>George Khalil</li>
+    <li>Salwa</li>
+  </ul>
+</section>
+
+<section class="block" id="overview">
+  <h2>Overview</h2>
+  <p>
+    Pulse Guardian ICU is a full-stack clinical decision-support system that processes ICU patient
+    data derived from the MIMIC-III database and presents an interactive dashboard with dynamic
+    risk scoring, explainable contributing factors, a simulated live-monitoring view, and clinical
+    report generation. This site documents the project's research question, engineering approach,
+    implementation, real validation results, development process, and user manual, and links to the
+    presentation and source repository.
+  </p>
+  <p>
+    <strong>What changed since the first presentation:</strong> the lecturer's feedback — that data
+    and alerts were not real-time, and that validation methodology needed to be shown, not asserted —
+    is addressed directly in <a href="#s3">Section 3</a> (real, computed evaluation against ground
+    truth outcomes, replacing previously hardcoded metrics) and <a href="#s4">Section 4</a>
+    (an honestly-labeled simulated live-monitoring feature, since the source dataset has no genuine
+    real-time feed to replay).
+  </p>
+</section>
+
+<section class="block" id="s1">
+  <h2><span class="num">1.</span>Research Question, Goals and Importance</h2>
+  <p><strong>Engineering problem.</strong> ICU clinicians must continuously track many patients'
+  vital signs and lab results to catch clinical deterioration early. Manual chart review does not
+  scale with patient load, and delayed recognition of deterioration is strongly associated with
+  worse outcomes. This is a well-studied problem in clinical informatics (early-warning scores such
+  as MEWS/NEWS are already used in practice), which makes it a good target for evaluating whether a
+  small team can build — and, critically, <em>validate</em> — a decision-support system rather than
+  just a plausible-looking demo.</p>
+
+  <p><strong>Research question.</strong> Can we build an ICU risk-monitoring system that (a) produces
+  an interpretable, explainable early-warning score from routinely collected vitals and labs, and
+  (b) have that score's actual predictive value verified against real clinical outcomes, rather than
+  asserted? A secondary question, forced by the dataset itself: since MIMIC-III only exposes
+  <strong>per-stay aggregated</strong> vitals (not a raw, continuous device feed), can a system still
+  meaningfully address "real-time" monitoring without fabricating a live feed that does not exist in
+  the source data?</p>
+
+  <h3>Goals</h3>
+  <ol>
+    <li>Ingest and structure MIMIC-III–derived ICU stay data into a queryable schema.</li>
+    <li>Build an interpretable, rule-based risk score with per-indicator explanations.</li>
+    <li>Train and rigorously validate a machine-learning model against a real outcome label, with a
+      documented baseline comparison — not hand-typed metrics.</li>
+    <li>Present results through a clinician-facing dashboard, including an honestly-labeled
+      simulated live-monitoring view.</li>
+    <li>Apply real software-engineering process: automated tests, CI, dependency pinning, and a
+      reviewable commit history.</li>
+  </ol>
+
+  <p><strong>Expected contribution.</strong> A working academic prototype; a documented, honest
+  comparison between an interpretable rule-based baseline and a trained ML model on the same ground
+  truth; and a software-engineering artifact trail that itself demonstrates the process the course
+  rubric asks for.</p>
+</section>
+
+<section class="block" id="s2">
+  <h2><span class="num">2.</span>Engineering Background and Proposed Method</h2>
+  <p>A full-stack web application: a FastAPI backend serving a REST + Server-Sent-Events API over a
+  SQLite database, and a React single-page frontend. Two parallel risk-scoring paths are computed
+  for every patient:</p>
+  <ul>
+    <li><strong>Rule-based engine</strong> (interpretable baseline): a weighted linear penalty
+      function over eleven clinical indicators against published normal ranges, plus an ICU
+      length-of-stay penalty and a multi-critical-indicator bonus, producing a 0–100 score and a
+      human-readable list of contributing factors.</li>
+    <li><strong>Trained ML model</strong> (Random Forest classifier): fit on the same eleven
+      indicators, using the dataset's real in-hospital-mortality outcome label, to produce a
+      calibrated mortality probability.</li>
+  </ul>
+
+  <h3>Architecture</h3>
+  <div class="arch-diagram">Data layer:      final_icu_dataset.csv (MIMIC-III derived, 61,439 rows)
+                      │
+Service layer:   data_loader.py  (ETL + synthetic demo generator)
+                 risk_engine.py (rule-based scoring + ML inference + metrics)
+                 live_monitor.py (simulated live-monitor state machine)
+                 train_model.py (offline training + evaluation)
+                      │
+API layer:       FastAPI routers — auth / patients / risk / alerts / reports / data / monitor (SSE)
+                      │
+Presentation:    React SPA — JWT-authenticated dashboard, per-patient tabs
+                 (Overview, Vitals, Labs, Risk, Live Monitor, Timeline, Alerts, Report)</div>
+
+  <h3>Algorithms</h3>
+  <p><em>Rule-based scoring:</em> for each indicator, a penalty in [0, 1] is computed by linear
+  interpolation between the normal range and a clinically defined critical threshold; penalties are
+  combined with fixed clinical weights (SpO₂ weighted highest at 15, sodium/WBC lowest at 5), plus
+  an ICU-LOS penalty tier and a critical-count bonus, capped at 100.</p>
+  <p><em>ML model:</em> <code>RandomForestClassifier</code> (300 trees, max depth 8,
+  <code>class_weight="balanced"</code> to handle the ~10.6% positive-class imbalance), trained on a
+  stratified 80/20 split with 5-fold cross-validation for a stability estimate, and median
+  imputation (fit on the training split only, to avoid leakage).</p>
+
+  <h3>Tools and Technologies</h3>
+  <p>Python 3.11, FastAPI, SQLAlchemy, scikit-learn, pandas/NumPy, JWT auth (python-jose,
+  passlib/bcrypt), React 18 + Recharts, pytest, GitHub Actions.</p>
+</section>
+
+<section class="block" id="s3">
+  <h2><span class="num">3.</span>Implementation and Evaluation of the Solution</h2>
+  <p><strong>Inputs.</strong> <code>final_icu_dataset.csv</code> — a MIMIC-III–derived, de-identified
+  dataset of 61,439 ICU stays, with per-stay aggregated (mean/min/max) vitals and labs,
+  demographic/admission fields, ICU length of stay, and a <code>HOSPITAL_EXPIRE_FLAG</code>
+  in-hospital-mortality outcome column.</p>
+
+  <p><strong>Preprocessing.</strong> Rows without a valid outcome label are dropped. Missing
+  lab/vital values are median-imputed, with the imputer fit only on the training split. The feature
+  set used for the ML model is deliberately identical to the rule engine's eleven clinical
+  indicators, so the two approaches are evaluated on the same inputs.</p>
+
+  <div class="stat-row">
+    <div class="stat"><div class="v">61,439</div><div class="l">ICU stays</div></div>
+    <div class="stat"><div class="v">10.6%</div><div class="l">Mortality rate</div></div>
+    <div class="stat"><div class="v">0.851</div><div class="l">ML model AUC-ROC</div></div>
+    <div class="stat"><div class="v">0.727</div><div class="l">Rule-baseline AUC-ROC</div></div>
+  </div>
+
+  <h3>Results (held-out test set, n = 12,288)</h3>
+  <table>
+    <thead><tr><th>Approach</th><th>AUC-ROC</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+    <tbody>
+      <tr><td>Rule-based baseline, <strong>as published</strong> (High risk ≥ 70)</td><td>0.727</td><td>0.00</td><td>0.00</td><td>0.00</td></tr>
+      <tr><td>Rule-based baseline, threshold calibrated on data</td><td>0.727</td><td>0.21</td><td>0.63</td><td>0.31</td></tr>
+      <tr><td><strong>Random Forest (trained, held-out test set)</strong></td><td><strong>0.851</strong></td><td>0.28</td><td>0.76</td><td>0.41</td></tr>
+    </tbody>
+  </table>
+  <p>5-fold cross-validation on the training split gives AUC-ROC 0.841 ± 0.006, indicating the
+  result is stable and not an artifact of one lucky split.</p>
+
+  <div class="finding">
+    <strong>Key finding.</strong> The rule engine's published "High risk" cutoff (score ≥ 70)
+    <strong>never fires</strong> on this population — precision and recall are both exactly zero at
+    that threshold, even though the same score ranks patients reasonably well (AUC-ROC 0.727). The
+    cutoff was chosen by inspection of the scoring formula, not by testing it against outcomes — the
+    difference between a score that <em>looks</em> plausible and one that is <em>validated</em>. This
+    was only visible once the score was evaluated against the real <code>HOSPITAL_EXPIRE_FLAG</code>
+    label.
+  </div>
+
+  <p>Feature importance from the trained model (creatinine, respiratory rate, and ICU length of stay
+  rank highest) is consistent with established clinical literature on organ dysfunction and
+  prolonged critical illness as mortality risk factors — a useful sanity check that the model learned
+  a clinically plausible signal rather than a spurious one.</p>
+</section>
+
+<section class="block" id="s4">
+  <h2><span class="num">4.</span>Development Process, Challenges and Lessons</h2>
+  <h3>Stages</h3>
+  <ol>
+    <li>Dataset understanding and schema design.</li>
+    <li>Rule-based scoring engine, built from published clinical reference ranges.</li>
+    <li>Full-stack scaffolding — API, database, and dashboard.</li>
+    <li>Synthetic demo-data generation for development and grading without the real dataset.</li>
+    <li>First in-class presentation and lecturer feedback: data and alerts were not real-time, and
+      validation methodology was unclear.</li>
+    <li>Response iteration: real ML validation against ground truth, an honestly-labeled simulated
+      live-monitoring feature, automated tests and CI, and this documentation.</li>
+  </ol>
+
+  <h3>Challenges and How They Were Resolved</h3>
+  <p><strong>No genuine real-time source.</strong> MIMIC-III (and this project's derived dataset)
+  exposes only per-stay aggregated vitals, not a continuous device feed — there is nothing to
+  "replay" in real time. Rather than fabricate a fake live feed, the Live Monitor feature explicitly
+  simulates a bounded, physiologically plausible trajectory within each patient's own recorded
+  min/max range, and is labeled as a simulation in the UI.</p>
+
+  <p><strong>Fabricated validation metrics.</strong> The model-evaluation endpoint originally
+  returned hand-typed numbers with a comment admitting they were placeholders. This was found and
+  fixed by re-examining the dataset, which turned out to already contain a real outcome column
+  (<code>HOSPITAL_EXPIRE_FLAG</code>) that nothing in the codebase was using. Building genuine
+  train/test validation on top of it replaced the fabricated numbers with real, reproducible ones.</p>
+
+  <p><strong>Repository hygiene.</strong> A <code>.gitignore</code> existed but was added after
+  <code>node_modules/</code> and the live SQLite database were already committed, so it had no
+  effect (43,966 tracked files). This has been corrected.</p>
+
+  <p><strong>Dependency drift.</strong> <code>passlib[bcrypt]</code> was unpinned against
+  <code>bcrypt</code>; a newer <code>bcrypt</code> release broke password hashing at startup on a
+  fresh install. Caught only by actually running the app end-to-end, not by inspection — pinned to a
+  known-compatible version and added to CI so it cannot silently regress again.</p>
+
+  <h3>Professional and Engineering Lessons</h3>
+  <ul>
+    <li>A demo can look complete while resting on numbers nobody actually computed — the only way
+      to know is to check what's behind the API response, not just what the dashboard renders.</li>
+    <li>An interpretable baseline can rank patients reasonably yet have miscalibrated thresholds;
+      this is only visible once you evaluate against real outcomes.</li>
+    <li>Commit hygiene and CI are cheap insurance against last-minute breakage that would otherwise
+      surface live during a presentation.</li>
+  </ul>
+</section>
+
+<section class="block" id="s5">
+  <h2><span class="num">5.</span>Summary and Future Work</h2>
+  <p><strong>Conclusions.</strong> A transparent, rule-based risk score is easy to explain to a
+  clinician but its decision thresholds require calibration against outcome data before they can be
+  trusted; a trained model substantially improves discrimination (AUC-ROC 0.851 vs. 0.727) at the
+  cost of interpretability. Surfacing both — the rule engine's explainable contributing factors
+  alongside the ML model's calibrated probability — is a reasonable engineering compromise for a
+  decision-support tool aimed at clinicians who need to understand <em>why</em>, not just
+  <em>what</em>.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="margin-top:0">Advantages</h3>
+      <ul>
+        <li>Explainable per-indicator scoring</li>
+        <li>Genuine, ground-truth-validated ML comparison</li>
+        <li>Honest treatment of the real-time limitation</li>
+        <li>Automated test suite and CI pipeline</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Limitations</h3>
+      <ul>
+        <li>Single-institution retrospective data</li>
+        <li>Aggregated, not time-series, features</li>
+        <li>Default dataset is synthetic demo data</li>
+        <li>SQLite is development-grade, not production</li>
+        <li>"Real-time" monitoring is a labeled simulation</li>
+        <li>Not clinically validated — academic use only</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Future Work</h3>
+  <ul>
+    <li>Model deterioration trajectories using MIMIC-III's finer-grained <code>chartevents</code>
+      time series instead of per-stay aggregates.</li>
+    <li>A threshold-calibration UI so the rule engine's risk bands can be tuned against outcome data
+      directly.</li>
+    <li>Validation on a second, external dataset.</li>
+    <li>A clinician usability study.</li>
+    <li>A production-grade database and hardened authentication before any deployment beyond an
+      academic demo.</li>
+  </ul>
+</section>
+
+<section class="block" id="s6">
+  <h2><span class="num">6.</span>User Manual</h2>
+  <h3>System Requirements</h3>
+  <p>Python 3.11+, Node.js 18+, npm. Python packages are pinned in
+  <code>backend/requirements.txt</code> (add <code>backend/requirements-dev.txt</code> to also run
+  tests).</p>
+
+  <h3>Installation and Running</h3>
+  <pre><code># Backend
+cd pulse-guardian-icu/backend
+python -m venv venv &amp;&amp; source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+# API docs: http://localhost:8000/api/docs
+
+# Frontend (separate terminal)
+cd pulse-guardian-icu/frontend
+npm install
+npm start
+# App: http://localhost:3000</code></pre>
+  <p>Default login: <code>admin</code> / <code>admin123</code>. On first run, the backend
+  auto-generates 200 synthetic demo patients so the system is usable without the real MIMIC-III
+  file.</p>
+
+  <h3>Regenerating the Real ML Evaluation</h3>
+  <pre><code>cd pulse-guardian-icu/backend
+python -m app.ml.train_model</code></pre>
+
+  <h3>Running the Test Suite</h3>
+  <pre><code>cd pulse-guardian-icu/backend
+pip install -r requirements-dev.txt
+pytest tests/ -v</code></pre>
+
+  <h3>Required Inputs</h3>
+  <p><code>backend/data/final_icu_dataset.csv</code> (already included), or nothing — synthetic
+  demo data is generated automatically if the database is empty. A real MIMIC-III–derived CSV can
+  also be uploaded via the dashboard's Data Import page (admin login required).</p>
+
+  <h3>Outputs</h3>
+  <p>Per-patient risk score and risk band (rule-based) plus a calibrated mortality probability (ML);
+  a ranked list of contributing clinical factors; live simulated alerts as thresholds are crossed; a
+  generated text clinical report; aggregate model evaluation metrics with a documented baseline
+  comparison.</p>
+
+  <h3>Repository Structure</h3>
+  <pre><code>pulse-guardian-icu/
+├── backend/
+│   ├── app/
+│   │   ├── api/        REST + SSE routes (auth, patients, risk, alerts, reports, data, monitor)
+│   │   ├── core/        DB session, JWT/password security, settings
+│   │   ├── ml/          risk_engine.py, train_model.py, artifacts/
+│   │   ├── models/      SQLAlchemy ORM models
+│   │   └── services/    data_loader.py, live_monitor.py
+│   ├── tests/           pytest suite (risk engine + API)
+│   └── data/            final_icu_dataset.csv
+├── frontend/src/
+│   ├── pages/            Dashboard, Patients, PatientDetail, Login
+│   ├── components/       shared UI
+│   ├── hooks/            auth context
+│   └── utils/            API client
+└── docs/                 full written report</code></pre>
+</section>
+
+<section class="block" id="s7">
+  <h2><span class="num">7.</span>Related Papers</h2>
+  <p>This seminar's theme is <em>Software Engineering in the AI Era</em>, so both papers read are
+  about using AI systems to perform software-engineering work — directly describing the methodology
+  behind how this project's own final round of improvements was carried out: an AI coding assistant
+  diagnosing gaps against a rubric, then autonomously implementing, validating, and testing a
+  repository-wide set of fixes.</p>
+
+  <h3>7.1 Paper Summaries</h3>
+  <div class="card">
+    <strong>AutoDev: Automated AI-Driven Development</strong> (Tufano et al., Microsoft, 2024).
+    <p>Proposes a fully automated AI-driven software development framework in which autonomous AI
+    agents perform file editing, retrieval, build, test execution, and git operations directly
+    within a repository, guided by a Conversation Manager, a Tools Library, an Agent Scheduler, and
+    a secure Docker-based Evaluation Environment. Unlike chat-based coding assistants that only
+    suggest snippets, AutoDev's agents run tests, read the resulting failure logs, and iteratively
+    fix their own code without human intervention beyond the initial objective. Evaluated on
+    HumanEval, AutoDev reaches 91.5% Pass@1 for code generation (vs. 67% zero-shot GPT-4) and 87.8%
+    Pass@1 for test generation with coverage comparable to human-written tests.</p>
+  </div>
+  <div class="card">
+    <strong>CodePlan: Repository-level Coding using LLMs and Planning</strong> (Bairi et al.,
+    Microsoft, 2023).
+    <p>Frames repository-level coding tasks — package migrations, propagating a change across many
+    inter-dependent files — as a planning problem. It builds an incremental dependency graph over
+    the repository, and after each LLM-driven edit, a change <em>may-impact analysis</em> determines
+    which other code blocks are now affected and schedules them as new edit obligations, using both
+    spatial and temporal context in each prompt. Evaluated across six repositories, CodePlan gets 5
+    of 6 to pass validity checks, while a baseline that reactively patches build errors without
+    planning passes none of them.</p>
+  </div>
+
+  <h3>7.2 Contribution of Each Paper to This Project</h3>
+  <p><strong>AutoDev's contribution.</strong> AutoDev's core argument — that an AI agent's value
+  comes from running build/test/validation loops and reacting to real output, not just generating
+  plausible code — is exactly what separated this project's earlier presentation from its final
+  version. This round of work followed AutoDev's write → test → read-failure → fix loop: the fake
+  metrics function was replaced by first writing a real training script, running it against the
+  dataset, reading the actual output (discovering the rule engine's threshold never fires), and only
+  then wiring the real numbers into the API — each step checked against a live server and a real
+  test suite rather than assumed correct.</p>
+
+  <p><strong>CodePlan's contribution.</strong> The fixes made were not confined to one file:
+  replacing the fake metrics touched the ML module, the API route, and the requirements file
+  together; adding the Live Monitor touched a new service module, a new API router, the router
+  registration, and a new frontend component — a small-scale version of the repository-level,
+  dependency-aware propagation CodePlan formalizes. CodePlan's finding that reactive,
+  build-error-only repair under-performs proactive dependency analysis is why each change here was
+  propagated deliberately to every file it affected, and verified end-to-end, rather than left to be
+  discovered by a build failure later.</p>
+</section>
+
+<section class="block" id="downloads">
+  <h2>Downloads &amp; Links</h2>
+  <div class="downloads">
+    <div class="download-card">
+      <strong>Full Written Report</strong>
+      <span>Sections 1–7 (this page is the canonical version)</span>
+      <a class="btn" href="#s1">Read on this page ↑</a>
+    </div>
+    <div class="download-card">
+      <strong>Presentation Slides</strong>
+      <span class="tag-hebrew">Hebrew</span>
+      <span>Original in-class presentation deck</span>
+      <a class="btn" href="assets/Pulse_Guardian_ICU_Presentation_Hebrew.pptx">Download .pptx</a>
+    </div>
+    <div class="download-card">
+      <strong>Source Code Repository</strong>
+      <span>Full backend + frontend source, commit history</span>
+      <a class="btn" href="https://github.com/salwa2106/SoftwareEng/tree/claude/icu-website-final-improvements-p8jjz6/pulse-guardian-icu" target="_blank" rel="noopener">Open on GitHub ↗</a>
+    </div>
+    <div class="download-card">
+      <strong>CI Pipeline</strong>
+      <span>Automated tests + build, run on every push</span>
+      <a class="btn" href="https://github.com/salwa2106/SoftwareEng/actions" target="_blank" rel="noopener">View Actions ↗</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Pulse Guardian ICU · Software Engineering in the AI Era · Final Project · MIMIC-III Dataset · Academic Use Only
+</footer>
+
+</body>
+</html>

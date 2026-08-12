@@ -1,0 +1,7 @@
+backend/venv/
+backend/pulse_guardian.db
+backend/__pycache__/
+backend/data/
+frontend/node_modules/
+*.pyc
+.env
